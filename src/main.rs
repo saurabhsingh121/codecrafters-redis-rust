@@ -1,7 +1,8 @@
 #![allow(unused_imports)]
 use std::{
     io::{Read, Write},
-    net::TcpListener
+    net::TcpListener,
+    thread::spawn,
 };
 
 fn main() {
@@ -10,12 +11,15 @@ fn main() {
     for stream in listener.incoming() {
         match stream {
             Ok(mut stream) => {
-                println!("accepted new connection");
-                
-                let mut buf = [0;512];
-                stream.read(&mut buf).unwrap();
+                // spawn a new thread to handle the connection
+                spawn(move || {
+                    println!("accepted new connection");
+                    
+                    let mut buf = [0;512];
+                    stream.read(&mut buf).unwrap();
 
-                stream.write(b"+PONG\r\n").unwrap();
+                    stream.write(b"+PONG\r\n").unwrap();
+                });
             }
             Err(e) => {
                 println!("error: {}", e);
