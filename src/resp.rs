@@ -15,6 +15,21 @@ impl Value {
             _ => panic!("Unsupported value for serialize"),
         }
     }
+
+    pub fn to_string(&self) -> String {
+        match self {
+            Value::SimpleString(s) => s.clone(),
+            Value::BulkString(s) => s.clone(),
+            Value::Array(arr) => {
+                let mut result = String::new();
+                for value in arr {
+                    result.push_str(&value.to_string());
+                    result.push_str(" "); // Separate array elements by a space
+                }
+                result.trim().to_string() // Remove any trailing space
+            }
+        }
+    }
 }
 pub struct RespHandler {
     stream: TcpStream,

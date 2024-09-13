@@ -4,6 +4,7 @@ use tokio::net::{TcpListener, TcpStream};
 use anyhow::Result;
 
 mod resp;
+mod store;
 
 #[tokio::main]
 async fn main() {
@@ -31,6 +32,7 @@ async fn main() {
 // *2\r\n$4\r\nECHO\r\n$3\r\nhey\r\n
 async fn handle_conn(stream: TcpStream) {
     let mut handler = resp::RespHandler::new(stream);
+    let mut store = store::Store::new();
     println!("Starting read loop");
     loop {
         let value = handler.read_value().await.unwrap();
@@ -38,9 +40,12 @@ async fn handle_conn(stream: TcpStream) {
         
         let response = if let Some(v) = value {
             let (command, args) = extract_command(v).unwrap();
+            println!("Got command {} with args {:?}", command, args);
             match command.to_lowercase().as_str() {
                 "ping" => Value::SimpleString("PONG".to_string()),
                 "echo" => args.first().unwrap().clone(),
+                "get" => store.get(args.first().unwrap()),
+                "set" => store.set(args.first().unwrap().to_string(), args.get(1).unwrap().to_string()),
                 c => panic!("Cannot handle command {}", c),
             }
         } else {
