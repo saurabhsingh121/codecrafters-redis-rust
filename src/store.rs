@@ -1,32 +1,43 @@
 use std::collections::HashMap;
-
+use tokio::time::{sleep, Duration};
+use std::sync::{Arc, Mutex};
 use crate::resp::Value;
 
 pub struct Store {
-    pub map:HashMap<String, String>,
+    pub map:Arc<Mutex<HashMap<String, String>>>,
 }
 
 impl Store {
     pub fn new() -> Self {
         Store {
-            map: HashMap::new(),
+            map: Arc::new(Mutex::new(HashMap::new())),
         }
     }
     
     // set a key value
-    pub fn set(&mut self, key: String, value: String) -> Value {
-        self.map.insert(key, value);
-        Value::SimpleString("OK".to_string())
+    pub fn set(&mut self, key: String, value: String, ttl: Option<Duration>) {
+        let mut store = self.map.lock().unwrap();
+        store.insert(key.clone(), value);
+
+        if let Some(ttl) = ttl {
+            let store_clone = Arc::clone(&self.map);
+            tokio::spawn(async move {
+                sleep(ttl).await;
+                let mut store = store_clone.lock().unwrap();
+                store.remove(&key);
+            });
+        }
     }
 
     // get a value
     pub fn get(&mut self, key: &Value) -> Value {
         let mut value = "";
-        if !self.map.contains_key(key.to_string().as_str()) {
+        let store = self.map.lock().unwrap();
+        if !store.contains_key(key.to_string().as_str()) {
             return Value::BulkString(value.to_string());
         }
 
-        value = self.map.get(key.clone().to_string().as_str()).unwrap();
+        value = store.get(key.clone().to_string().as_str()).unwrap();
         return Value::BulkString(value.to_string());
     }
 }

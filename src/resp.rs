@@ -11,7 +11,13 @@ impl Value {
     pub fn serialize(self) -> String {
         match self {
             Value::SimpleString(s) => format!("+{}\r\n", s),
-            Value::BulkString(s) => format!("${}\r\n{}\r\n", s.chars().count(), s),
+            Value::BulkString(s) => {
+                if s.is_empty() {
+                    "$-1\r\n".to_string()  // Null bulk string format
+                } else {
+                    format!("${}\r\n{}\r\n", s.chars().count(), s)  // Normal bulk string format
+                }
+            },
             _ => panic!("Unsupported value for serialize"),
         }
     }

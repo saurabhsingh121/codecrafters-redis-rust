@@ -2,6 +2,7 @@
 use resp::Value;
 use tokio::net::{TcpListener, TcpStream};
 use anyhow::Result;
+use std::time::Duration;
 
 mod resp;
 mod store;
@@ -45,7 +46,25 @@ async fn handle_conn(stream: TcpStream) {
                 "ping" => Value::SimpleString("PONG".to_string()),
                 "echo" => args.first().unwrap().clone(),
                 "get" => store.get(args.first().unwrap()),
-                "set" => store.set(args.first().unwrap().to_string(), args.get(1).unwrap().to_string()),
+                "set" => {
+                    if args.len() > 2 {
+                        let px = args.get(2).unwrap().to_string();
+                        if px.to_lowercase().as_str() == "px" {
+                            store.set(
+                                args.first().unwrap().to_string(),
+                                args.get(1).unwrap().to_string(),
+                                Some(Duration::from_millis(args.get(3).unwrap().to_string().parse::<u64>().unwrap())),
+                            );
+                        } 
+                    } else {
+                        store.set(
+                            args.first().unwrap().to_string(),
+                            args.get(1).unwrap().to_string(),
+                            None,
+                        );
+                    }   
+                    Value::SimpleString("OK".to_string())
+                },
                 c => panic!("Cannot handle command {}", c),
             }
         } else {
