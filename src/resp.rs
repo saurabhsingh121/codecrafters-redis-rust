@@ -18,7 +18,16 @@ impl Value {
                     format!("${}\r\n{}\r\n", s.chars().count(), s)  // Normal bulk string format
                 }
             },
-            _ => panic!("Unsupported value for serialize"),
+            Value::Array(arr) => {
+                let mut result = String::new();
+                result.push_str("*");
+                result.push_str(&arr.len().to_string());
+                result.push_str("\r\n");
+                for value in arr {
+                    result.push_str(&value.serialize());
+                }
+                result
+            },
         }
     }
 

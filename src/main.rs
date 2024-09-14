@@ -2,7 +2,7 @@
 use resp::Value;
 use tokio::net::{TcpListener, TcpStream};
 use anyhow::Result;
-use std::time::Duration;
+use std::{env,time::Duration};
 
 mod resp;
 mod store;
@@ -10,16 +10,20 @@ mod store;
 #[tokio::main]
 async fn main() {
     let listener = TcpListener::bind("127.0.0.1:6379").await.unwrap();
-    
+    let args:Vec<String> = env::args().collect();
     loop {
         let stream = listener.accept().await;
         
         match stream {
             Ok((stream, _)) => {
                 println!("accepted new connection");
-
+                let mut args_to_pass = Vec::new();
+                if args.len() > 1 {
+                    args_to_pass = args[1..].to_vec();    
+                }
+                
                 tokio::spawn(async move{
-                    handle_conn(stream).await
+                    handle_conn(stream, args_to_pass).await;
                 });
             }
             Err(e) => {
@@ -31,10 +35,15 @@ async fn main() {
 
 
 // *2\r\n$4\r\nECHO\r\n$3\r\nhey\r\n
-async fn handle_conn(stream: TcpStream) {
+async fn handle_conn(stream: TcpStream, cmd_args: Vec<String>) {
     let mut handler = resp::RespHandler::new(stream);
     let mut store = store::Store::new();
     println!("Starting read loop");
+    print!("Got args {:?}", cmd_args);
+    if cmd_args.len() > 0 {
+        store.set(remove_prefix(cmd_args[0].as_str()), cmd_args[1].clone(), None);
+        store.set(remove_prefix(cmd_args[2].as_str()), cmd_args[3].clone(), None);   
+    }
     loop {
         let value = handler.read_value().await.unwrap();
         println!("Got value {:?}", value);
@@ -65,6 +74,16 @@ async fn handle_conn(stream: TcpStream) {
                     }   
                     Value::SimpleString("OK".to_string())
                 },
+                "config" => {
+                    if args.first().unwrap().to_string().to_lowercase().as_str() == "get" {
+                        let key = args.get(1).unwrap();
+                        let value = store.get(key);
+                        let response:Vec<Value> = vec![Value::BulkString(key.to_string()), value];
+                        Value::Array(response)
+                    }else  {
+                        Value::SimpleString("Error".to_string())
+                    }
+                },
                 c => panic!("Cannot handle command {}", c),
             }
         } else {
@@ -90,4 +109,10 @@ fn unpack_bulk_str(value: Value) -> Result<String> {
         Value::BulkString(s) => Ok(s),
         _ => Err(anyhow::anyhow!("Expected command to be a bulk string"))
     }
+}
+
+fn remove_prefix(arg: &str) -> String {
+    arg.strip_prefix("--")
+        .unwrap_or(arg)
+        .to_string()  
 }
